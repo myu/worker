@@ -39,6 +39,7 @@ jobs:
       STORAGE_BUCKET: ${{ secrets.STORAGE_BUCKET }}
       STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
       STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
+      STORAGE_ROOT_PATH: ${{ secrets.STORAGE_ROOT_PATH }}
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -57,4 +58,5 @@ jobs:
             -e STORAGE_BUCKET \
             -e STORAGE_ACCESS_KEY_ID \
             -e STORAGE_SECRET_ACCESS_KEY \
+            -e STORAGE_ROOT_PATH \
             product-video-media-worker:"${GITHUB_SHA}" run

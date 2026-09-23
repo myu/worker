@@ -25,6 +25,7 @@ STORAGE_REGION
 STORAGE_BUCKET
 STORAGE_ACCESS_KEY_ID
 STORAGE_SECRET_ACCESS_KEY
+STORAGE_ROOT_PATH
 ```
 
 Secrets are injected by the executor at runtime and must never be committed or passed as command-line arguments.

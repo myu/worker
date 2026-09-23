@@ -11,7 +11,8 @@ const completeEnvironment = {
   STORAGE_REGION: 'ap-singapore',
   STORAGE_BUCKET: 'bucket',
   STORAGE_ACCESS_KEY_ID: 'access',
-  STORAGE_SECRET_ACCESS_KEY: 'secret'
+  STORAGE_SECRET_ACCESS_KEY: 'secret',
+  STORAGE_ROOT_PATH: 'microsaas'
 }
 
 describe('readWorkerEnvironment', () => {

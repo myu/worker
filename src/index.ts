@@ -16,6 +16,7 @@ export interface WorkerEnvironment {
   storageBucket: string
   storageAccessKeyId: string
   storageSecretAccessKey: string
+  storageRootPath: string
   workDir: string
 }
 
@@ -33,6 +34,7 @@ export function readWorkerEnvironment(
     storageBucket: source.STORAGE_BUCKET,
     storageAccessKeyId: source.STORAGE_ACCESS_KEY_ID,
     storageSecretAccessKey: source.STORAGE_SECRET_ACCESS_KEY,
+    storageRootPath: source.STORAGE_ROOT_PATH || '',
     workDir: source.WORK_DIR || '/workspace'
   }
 
@@ -71,6 +73,14 @@ function run(command: string, args: string[], timeoutMs = 10 * 60 * 1000) {
   return result.stdout
 }
 
+
+function resolveStorageKey(env: WorkerEnvironment, key: string) {
+  const root = env.storageRootPath.replace(/^\/+|\/+$/g, '')
+  const normalized = key.replace(/^\/+/, '')
+  if (!root || normalized === root || normalized.startsWith(`${root}/`)) return normalized
+  return `${root}/${normalized}`
+}
+
 function createStorageClient(env: WorkerEnvironment) {
   const forcePathStyle = !env.storageEndpoint.includes('myqcloud.com') && !env.storageEndpoint.includes('aliyuncs.com')
   return new S3Client({
@@ -86,7 +96,7 @@ function createStorageClient(env: WorkerEnvironment) {
 
 async function downloadObject(env: WorkerEnvironment, key: string, target: string) {
   const client = createStorageClient(env)
-  const result = await client.send(new GetObjectCommand({ Bucket: env.storageBucket, Key: key }))
+  const result = await client.send(new GetObjectCommand({ Bucket: env.storageBucket, Key: resolveStorageKey(env, key) }))
   if (!result.Body) throw new Error(`Storage object has no body: ${key}`)
   const bytes = await result.Body.transformToByteArray()
   fs.writeFileSync(target, bytes)
@@ -98,7 +108,7 @@ async function uploadObject(env: WorkerEnvironment, key: string, source: string,
   const body = fs.readFileSync(source)
   await client.send(new PutObjectCommand({
     Bucket: env.storageBucket,
-    Key: key,
+    Key: resolveStorageKey(env, key),
     Body: body,
     ContentType: contentType
   }))
