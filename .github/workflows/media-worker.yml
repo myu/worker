@@ -1,0 +1,60 @@
+name: Media Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: ProductVideoAI job ID
+        required: true
+        type: string
+      step_id:
+        description: ProductVideoAI job step ID
+        required: true
+        type: string
+      attempt_id:
+        description: ProductVideoAI job attempt ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-worker-${{ inputs.job_id }}-${{ inputs.step_id }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: media-worker
+    env:
+      JOB_ID: ${{ inputs.job_id }}
+      STEP_ID: ${{ inputs.step_id }}
+      ATTEMPT_ID: ${{ inputs.attempt_id }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      STORAGE_ENDPOINT: ${{ secrets.STORAGE_ENDPOINT }}
+      STORAGE_REGION: ${{ secrets.STORAGE_REGION }}
+      STORAGE_BUCKET: ${{ secrets.STORAGE_BUCKET }}
+      STORAGE_ACCESS_KEY_ID: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
+      STORAGE_SECRET_ACCESS_KEY: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build Worker image
+        run: docker buildx build --platform linux/amd64 --load -t product-video-media-worker:"${GITHUB_SHA}" .
+      - name: Execute Worker step
+        run: |
+          docker run --rm \
+            -e JOB_ID \
+            -e STEP_ID \
+            -e ATTEMPT_ID \
+            -e SUPABASE_URL \
+            -e SUPABASE_SERVICE_ROLE_KEY \
+            -e STORAGE_ENDPOINT \
+            -e STORAGE_REGION \
+            -e STORAGE_BUCKET \
+            -e STORAGE_ACCESS_KEY_ID \
+            -e STORAGE_SECRET_ACCESS_KEY \
+            product-video-media-worker:"${GITHUB_SHA}" run
