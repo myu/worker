@@ -214,6 +214,14 @@ async function execute(env: WorkerEnvironment) {
 
   const workingDir = path.join(env.workDir, env.jobId, env.stepId)
   fs.mkdirSync(workingDir, { recursive: true })
+  const heartbeat = setInterval(() => {
+    const now = new Date().toISOString()
+    void Promise.all([
+      supabase.from('job_steps').update({ heartbeat_at: now }).eq('id', env.stepId),
+      supabase.from('job_attempts').update({ heartbeat_at: now }).eq('id', env.attemptId)
+    ])
+  }, 30_000)
+  heartbeat.unref()
 
   try {
     await checkpointCancellation(supabase, env.jobId)
@@ -267,6 +275,7 @@ async function execute(env: WorkerEnvironment) {
     })
     throw error
   } finally {
+    clearInterval(heartbeat)
     fs.rmSync(workingDir, { recursive: true, force: true })
   }
 }
