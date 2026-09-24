@@ -411,10 +411,9 @@ async function executeAiVideoStep(
         negative_prompt: payload.negative_prompt
       },
       parameters: {
-        resolution: '1080P',
-        duration: Number(payload.duration_seconds || 5),
-        prompt_extend: true,
-        watermark: false
+        resolution: '480P',
+        ratio: 'adaptive',
+        duration: Number(payload.duration_seconds || 5)
       }
     }
     const response = await dashscopeRequest<{ output?: Record<string, any> }>(
