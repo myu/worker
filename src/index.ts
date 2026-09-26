@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib'
 import process from 'node:process'
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Agent, fetch as undiciFetch, type Dispatcher } from 'undici'
@@ -289,6 +290,7 @@ async function getAiVideoProvider(supabase: SupabaseClient, providerId: string) 
 }
 
 async function dashscopeRequest<T>(provider: AiVideoProviderRow, path: string, init: RequestInit = {}) {
+  console.log(`[INFO] provider request ${init.method || 'GET'} ${path}`)
   const response = await fetch(dashscopeUrl(provider.base_url, path), {
     ...init,
     headers: {
@@ -298,7 +300,32 @@ async function dashscopeRequest<T>(provider: AiVideoProviderRow, path: string, i
     },
     signal: init.signal || AbortSignal.timeout(60_000)
   })
-  const payload = await response.json().catch(() => ({}))
+  const responseBuffer = Buffer.from(await response.arrayBuffer())
+  const encoding = String(response.headers.get('content-encoding') || '').toLowerCase()
+  const decoders: Array<(input: Buffer) => Buffer> = []
+  if (encoding.includes('gzip') || (responseBuffer[0] === 0x1f && responseBuffer[1] === 0x8b)) decoders.push(gunzipSync)
+  if (encoding.includes('br')) decoders.push(brotliDecompressSync)
+  if (encoding.includes('deflate')) decoders.push(inflateSync)
+  decoders.push((input) => input)
+
+  let payload: any = null
+  let lastPreview = ''
+  for (const decode of decoders) {
+    try {
+      const responseText = decode(responseBuffer).toString('utf8').trim()
+      lastPreview = responseText.slice(0, 300)
+      payload = responseText ? JSON.parse(responseText) : {}
+      break
+    } catch {
+      // Try the next supported content encoding.
+    }
+  }
+  if (payload === null) {
+    throw Object.assign(new Error(`DashScope returned non-JSON response: ${lastPreview || 'empty response'}`), {
+      status: response.status,
+      data: { response_preview: lastPreview }
+    })
+  }
   if (!response.ok || payload?.code) {
     throw Object.assign(new Error(payload?.message || `DashScope request failed: ${response.status}`), {
       status: response.status,
@@ -471,7 +498,9 @@ async function executeAiVideoStep(
         `tasks/${encodeURIComponent(providerJob.provider_job_id)}`,
         { method: 'GET' }
       )
-      const status = normalizeProviderStatus(response.output?.task_status || (response as any).task_status)
+      const rawStatus = response.output?.task_status || (response as any).task_status
+      const status = normalizeProviderStatus(rawStatus)
+      console.log(`[INFO] provider task ${providerJob.provider_job_id} status=${rawStatus || 'unknown'} normalized=${status}`)
       lastStatus = status
       await updateProviderVideoJob(supabase, providerJob.id, {
         status,
