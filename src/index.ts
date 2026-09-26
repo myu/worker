@@ -425,9 +425,9 @@ async function executeAiVideoStep(
         body: JSON.stringify(requestPayload)
       }
     )
-    const providerJobId = String(response.output?.task_id || '')
+    const providerJobId = String(response.output?.task_id || (response as any).task_id || '')
     if (!providerJobId) throw new Error('DashScope did not return task_id')
-    const status = normalizeProviderStatus(response.output?.task_status)
+    const status = normalizeProviderStatus(response.output?.task_status || (response as any).task_status)
     const estimatedCost = Number(payload.estimated_cost || 0)
     const { error } = await supabase.from('provider_video_jobs').upsert({
       workspace_id: step.workspace_id,
@@ -471,7 +471,7 @@ async function executeAiVideoStep(
         `tasks/${encodeURIComponent(providerJob.provider_job_id)}`,
         { method: 'GET' }
       )
-      const status = normalizeProviderStatus(response.output?.task_status)
+      const status = normalizeProviderStatus(response.output?.task_status || (response as any).task_status)
       lastStatus = status
       await updateProviderVideoJob(supabase, providerJob.id, {
         status,
